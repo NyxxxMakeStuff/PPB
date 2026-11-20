@@ -135,7 +135,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await ApiService.register(nama: nama, email: email, password: password);
+      final displayName = nama.trim().isNotEmpty ? nama.trim() : email.split('@').first;
+      await ApiService.register(
+        nama: displayName,
+        email: email,
+        password: password,
+      );
       final userJson = await ApiService.getMe();
       _userProfile = UserProfile.fromJson(userJson, defaultWeight: _userProfile.weightKg);
       _isLoggedIn = true;
@@ -184,6 +189,27 @@ class AppState extends ChangeNotifier {
   Future<void> refreshDataFromApi() async {
     if (_isGuestMode) return;
     try {
+      // 1. Refresh profile info
+      try {
+        final userJson = await ApiService.getMe();
+        _userProfile = UserProfile.fromJson(userJson, defaultWeight: _userProfile.weightKg);
+      } catch (_) {}
+
+      // 2. Refresh weight logs
+      try {
+        final weightLogs = await ApiService.getBodyWeightLogs();
+        if (weightLogs.isNotEmpty) {
+          final lastLog = weightLogs.last;
+          if (lastLog is Map<String, dynamic> && lastLog['berat_kg'] != null) {
+            final wVal = double.tryParse(lastLog['berat_kg'].toString());
+            if (wVal != null) {
+              _userProfile = _userProfile.copyWith(weightKg: wVal.round());
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 3. Refresh workout logs
       final workoutLogs = await ApiService.getWorkoutLogs();
       _workouts.clear();
       int totalMinutes = 0;
@@ -191,23 +217,30 @@ class AppState extends ChangeNotifier {
         if (item is Map<String, dynamic>) {
           final workoutItem = WorkoutItem.fromJson(item);
           _workouts.add(workoutItem);
-          final dur = int.tryParse(item['durasi_menit']?.toString() ?? '0') ?? 0;
+          final dur = int.tryParse(item['total_durasi_menit']?.toString() ?? item['durasi_menit']?.toString() ?? '0') ?? 0;
           totalMinutes += dur;
         }
       }
       _exerciseMinutes = totalMinutes;
 
-      final nutritionLogs = await ApiService.getNutritionLogs();
+      // 4. Refresh nutrition logs & items
       int totalKcal = 0;
       int totalProt = 0;
-      for (var nLog in nutritionLogs) {
-        if (nLog is Map<String, dynamic>) {
-          final kcal = int.tryParse(nLog['total_kalori']?.toString() ?? '0') ?? 0;
-          final prot = int.tryParse(nLog['total_protein']?.toString() ?? '0') ?? 0;
-          totalKcal += kcal;
-          totalProt += prot;
+
+      try {
+        final items = await ApiService.getNutritionLogItems();
+        if (items.isNotEmpty) {
+          for (var it in items) {
+            if (it is Map<String, dynamic>) {
+              final kcal = double.tryParse(it['kalori']?.toString() ?? '0') ?? 0;
+              final prot = double.tryParse(it['protein_g']?.toString() ?? '0') ?? 0;
+              totalKcal += kcal.round();
+              totalProt += prot.round();
+            }
+          }
         }
-      }
+      } catch (_) {}
+
       _caloriesConsumed = totalKcal;
       _proteinConsumed = totalProt;
       _weeklyCalories['Kam'] = _caloriesConsumed;
@@ -246,15 +279,18 @@ class AppState extends ChangeNotifier {
 
     if (!_isGuestMode && _userProfile.id != null) {
       try {
-        final Map<String, dynamic> body = {};
-        if (heightCm != null) body['tinggi_cm'] = heightCm;
-        if (targetKcal != null) body['target_kalori'] = targetKcal;
-        if (targetProteinG != null) body['target_protein'] = targetProteinG;
-        await ApiService.updateUserProfile(_userProfile.id!, body);
+        final Map<String, dynamic> updateData = {};
+        if (heightCm != null) updateData['tinggi_cm'] = heightCm;
+        if (targetKcal != null) updateData['target_kalori'] = targetKcal;
+        if (targetProteinG != null) updateData['target_protein'] = targetProteinG;
+        
+        if (updateData.isNotEmpty) {
+          await ApiService.updateUserProfile(_userProfile.id!, updateData);
+        }
 
         if (weightKg != null) {
           final today = DateTime.now().toIso8601String().split('T').first;
-          await ApiService.logBodyWeight(weightKg.toDouble(), today);
+          await ApiService.logBodyWeight(_userProfile.id!, weightKg.toDouble(), today);
         }
       } catch (e) {
         debugPrint('Failed to sync profile update to server: $e');
@@ -301,11 +337,13 @@ class AppState extends ChangeNotifier {
     _exerciseMinutes += durationMinutes;
     notifyListeners();
 
-    if (!_isGuestMode) {
+    if (!_isGuestMode && _userProfile.id != null) {
       try {
         await ApiService.createWorkoutLog(
-          tanggal: todayStr,
-          durasiMenit: durationMinutes,
+          _userProfile.id!,
+          todayStr,
+          durationMinutes,
+          totalKaloriTerbakar: (durationMinutes * 7.0),
           catatan: '$title - $subtitle',
         );
       } catch (e) {
@@ -320,15 +358,49 @@ class AppState extends ChangeNotifier {
     _weeklyCalories['Kam'] = _caloriesConsumed;
     notifyListeners();
 
-    if (!_isGuestMode) {
+    if (!_isGuestMode && _userProfile.id != null) {
       try {
         final todayStr = DateTime.now().toIso8601String().split('T').first;
-        await ApiService.createNutritionLog(
-          tanggal: todayStr,
-          waktuMakan: 'sarapan',
-          totalKalori: _currentMeal.totalCalories,
-          totalProtein: _currentMeal.proteinG,
+        String waktuMakan = 'sarapan';
+        final lowerCat = _currentMeal.categoryTime.toLowerCase();
+        if (lowerCat.contains('siang')) {
+          waktuMakan = 'siang';
+        } else if (lowerCat.contains('malam')) {
+          waktuMakan = 'malam';
+        } else if (lowerCat.contains('snack')) {
+          waktuMakan = 'snack';
+        }
+
+        final res = await ApiService.createNutritionLog(
+          _userProfile.id!,
+          todayStr,
+          waktuMakan,
         );
+
+        final Map<String, dynamic> logData = (res['data'] is Map<String, dynamic>)
+            ? res['data'] as Map<String, dynamic>
+            : res;
+        final logId = logData['id'] is int ? logData['id'] as int : int.tryParse(logData['id']?.toString() ?? '');
+
+        if (logId != null) {
+          try {
+            final foods = await ApiService.getFoods();
+            int foodId = 1;
+            if (foods.isNotEmpty && foods[0] is Map && foods[0]['id'] != null) {
+              foodId = int.tryParse(foods[0]['id'].toString()) ?? 1;
+            }
+
+            await ApiService.createNutritionLogItem(
+              logId,
+              foodId,
+              100.0,
+              _currentMeal.totalCalories.toDouble(),
+              _currentMeal.proteinG.toDouble(),
+              carbsG: _currentMeal.carbsG.toDouble(),
+              fatG: _currentMeal.fatG.toDouble(),
+            );
+          } catch (_) {}
+        }
       } catch (e) {
         debugPrint('Failed to create nutrition log on server: $e');
       }

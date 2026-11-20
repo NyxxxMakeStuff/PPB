@@ -26,6 +26,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = AppStateProvider.of(context);
     final workouts = state.filteredWorkouts.where((w) {
@@ -33,6 +39,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
       return w.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           w.subtitle.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
+
+    int totalMinutes = 0;
+    for (var item in workouts) {
+      final valNum = int.tryParse(item.value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 15;
+      totalMinutes += valNum;
+    }
+    final String durationSummary = totalMinutes >= 60
+        ? '${totalMinutes ~/ 60} j ${totalMinutes % 60} mnt'
+        : '$totalMinutes mnt';
 
     // Group workouts by date
     final Map<String, List<WorkoutItem>> groupedWorkouts = {};
@@ -104,18 +119,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   const SizedBox(height: 8),
                   // Summary text
                   Row(
-                    children: const [
-                      Text(
+                    children: [
+                      const Text(
                         'Minggu ini',
                         style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                       ),
-                      Padding(
+                      const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 6),
                         child: Text('·', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
                       ),
                       Text(
-                        '5 sesi · 3 j 12 mnt',
-                        style: TextStyle(
+                        '${workouts.length} sesi · $durationSummary',
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: AppColors.darkCharcoal,
@@ -174,17 +189,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                     }),
 
                   const SizedBox(height: 16),
-                  // Bottom action link: "Lihat riwayat sebelumnya"
-                  const Center(
-                    child: Text(
-                      'Lihat riwayat sebelumnya',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 90), // Spacing for FAB
                 ],
               ),

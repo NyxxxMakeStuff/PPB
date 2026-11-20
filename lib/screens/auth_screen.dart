@@ -15,12 +15,41 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
   bool _isRegistering = false;
 
-  void _handleAuth() {
+  void _handleAuth() async {
     final state = AppStateProvider.of(context);
-    state.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email dan kata sandi tidak boleh kosong.'),
+          backgroundColor: AppColors.accentOrange,
+        ),
+      );
+      return;
+    }
+
+    final String? error = _isRegistering
+        ? await state.register(
+            email.split('@').first,
+            email,
+            password,
+          )
+        : await state.login(
+            email,
+            password,
+          );
+
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: AppColors.accentOrange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _handleGuest() {
@@ -58,6 +87,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = AppStateProvider.of(context);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -167,7 +198,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _handleAuth,
+                  onPressed: state.isLoading ? null : _handleAuth,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.darkCharcoal,
                     foregroundColor: Colors.white,
@@ -176,10 +207,19 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    _isRegistering ? 'Daftar' : 'Masuk',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: state.isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _isRegistering ? 'Daftar' : 'Masuk',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
               const SizedBox(height: 28),

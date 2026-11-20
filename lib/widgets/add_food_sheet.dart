@@ -17,7 +17,7 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
   final TextEditingController _portionController = TextEditingController(text: '1 porsi');
   String _waktuMakan = 'sarapan';
 
-  void _saveFood() {
+  void _saveFood() async {
     final title = _titleController.text.trim();
     final kcal = int.tryParse(_caloriesController.text.trim()) ?? 0;
     final protein = int.tryParse(_proteinController.text.trim()) ?? 0;
@@ -50,16 +50,18 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
     );
 
     state.updateMeal(newMeal);
-    state.logMealAgain();
+    await state.logMealAgain();
 
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Makanan "$title" ($kcal kkal) berhasil dicatat!'),
-        backgroundColor: AppColors.darkCharcoal,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Makanan "$title" ($kcal kkal) berhasil dicatat!'),
+          backgroundColor: AppColors.darkCharcoal,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override

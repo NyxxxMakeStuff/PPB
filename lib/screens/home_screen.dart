@@ -7,10 +7,20 @@ class HomeScreen extends StatelessWidget {
   final Function(int) onNavigateTab;
   const HomeScreen({super.key, required this.onNavigateTab});
 
+  String _formattedTodayDate() {
+    final now = DateTime.now();
+    final days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+    final months = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'];
+    return '${days[now.weekday % 7]}, ${now.day} ${months[now.month - 1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppStateProvider.of(context);
     final user = state.userProfile;
+    final todayWorkouts = state.filteredWorkouts.where((w) {
+      return w.dateGroup.contains('HARI INI') || w.dateGroup.contains('KAM');
+    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -25,7 +35,7 @@ class HomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'KAMIS, 22 OKTOBER',
+                    _formattedTodayDate(),
                     style: AppTheme.uppercaseSubHeader(),
                   ),
                   Container(
@@ -41,15 +51,15 @@ class HomeScreen extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2E6B4A),
+                          decoration: BoxDecoration(
+                            color: state.isLoggedIn && !state.isGuestMode ? const Color(0xFF2E6B4A) : AppColors.accentOrange,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'Tersimpan lokal',
-                          style: TextStyle(
+                        Text(
+                          state.isLoggedIn && !state.isGuestMode ? 'Terhubung ke server' : 'Tersimpan lokal',
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: AppColors.darkCharcoal,
@@ -117,7 +127,9 @@ class HomeScreen extends StatelessWidget {
                     // Progress Bar
                     LayoutBuilder(
                       builder: (ctx, constraints) {
-                        double progress = (state.caloriesConsumed / user.targetKcal).clamp(0.0, 1.0);
+                        double progress = user.targetKcal > 0
+                            ? (state.caloriesConsumed / user.targetKcal).clamp(0.0, 1.0)
+                            : 0.0;
                         return Stack(
                           children: [
                             Container(
@@ -261,11 +273,11 @@ class HomeScreen extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        'Target 2.600',
-                        style: TextStyle(
+                        'Target ${_formatNumber(user.targetKcal)}',
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.accentOrange.withOpacity(0.9),
+                          color: AppColors.accentOrange,
                         ),
                       ),
                     ),
@@ -281,7 +293,7 @@ class HomeScreen extends StatelessWidget {
                             right: 0,
                             child: CustomPaint(
                               size: const Size(double.infinity, 1),
-                              painter: DashedLinePainter(color: AppColors.accentOrange.withOpacity(0.5)),
+                              painter: DashedLinePainter(color: AppColors.accentOrange),
                             ),
                           ),
                           // Bars row
@@ -330,9 +342,16 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 14),
 
               // Workout items list
-              ...state.filteredWorkouts
-                  .where((w) => w.dateGroup.contains('HARI INI') || w.dateGroup.contains('KAM'))
-                  .map((workout) => _buildWorkoutRow(workout)),
+              if (todayWorkouts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'Belum ada catatan latihan hari ini.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                  ),
+                )
+              else
+                ...todayWorkouts.map((workout) => _buildWorkoutRow(workout)),
 
               const SizedBox(height: 20),
             ],

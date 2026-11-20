@@ -30,14 +30,21 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json, {int defaultWeight = 68}) {
-    final heightVal = double.tryParse(json['tinggi_cm']?.toString() ?? '') ?? 172.0;
-    final kcalVal = double.tryParse(json['target_kalori']?.toString() ?? '') ?? 2600.0;
-    final protVal = double.tryParse(json['target_protein']?.toString() ?? '') ?? 130.0;
+    final userMap = (json['data'] is Map<String, dynamic>)
+        ? json['data'] as Map<String, dynamic>
+        : json;
+
+    final heightVal = double.tryParse(userMap['tinggi_cm']?.toString() ?? '') ?? 172.0;
+    final kcalVal = double.tryParse(userMap['target_kalori']?.toString() ?? '') ?? 2600.0;
+    final protVal = double.tryParse(userMap['target_protein']?.toString() ?? '') ?? 130.0;
+    final idVal = userMap['id'] is int
+        ? userMap['id'] as int
+        : int.tryParse(userMap['id']?.toString() ?? '');
 
     return UserProfile(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
-      name: json['nama']?.toString() ?? json['name']?.toString() ?? 'Dimas Pratama',
-      email: json['email']?.toString() ?? 'dimas@email.com',
+      id: idVal,
+      name: userMap['nama']?.toString() ?? userMap['name']?.toString() ?? 'Pengguna',
+      email: userMap['email']?.toString() ?? '',
       weightKg: defaultWeight,
       heightCm: heightVal.round(),
       targetKcal: kcalVal.round(),
@@ -102,29 +109,65 @@ class WorkoutItem {
   });
 
   factory WorkoutItem.fromJson(Map<String, dynamic> json) {
-    final catStr = (json['kategori'] ?? json['category'] ?? 'beban').toString().toLowerCase();
+    final catStr = (json['kategori'] ?? json['category'] ?? '').toString().toLowerCase();
+    final notes = json['catatan']?.toString() ?? json['title']?.toString() ?? 'Latihan';
+
+    String title = notes;
+    String subtitle = json['rincian']?.toString() ?? 'Sesi latihan';
+
+    if (notes.contains(' - ')) {
+      final parts = notes.split(' - ');
+      title = parts[0];
+      subtitle = parts.sublist(1).join(' - ');
+    }
+
+    final combinedStr = '$title $catStr'.toLowerCase();
     WorkoutCategory category = WorkoutCategory.beban;
     Color catColor = const Color(0xFF386B49);
 
-    if (catStr.contains('kardio') || catStr.contains('cardio')) {
+    if (combinedStr.contains('kardio') ||
+        combinedStr.contains('cardio') ||
+        combinedStr.contains('lari') ||
+        combinedStr.contains('running')) {
       category = WorkoutCategory.kardio;
       catColor = const Color(0xFFD89B33);
-    } else if (catStr.contains('core')) {
+    } else if (combinedStr.contains('core') ||
+        combinedStr.contains('plank') ||
+        combinedStr.contains('abs')) {
       category = WorkoutCategory.core;
       catColor = const Color(0xFF3B6B77);
     }
 
-    final duration = json['durasi_menit']?.toString() ?? '15';
+    final duration = json['total_durasi_menit']?.toString() ??
+        json['durasi_menit']?.toString() ??
+        '15';
+
+    String dateGroup = 'HARI INI';
+    if (json['tanggal'] != null) {
+      try {
+        final dt = DateTime.parse(json['tanggal'].toString());
+        final now = DateTime.now();
+        if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+          dateGroup = 'HARI INI';
+        } else {
+          final days = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
+          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+          dateGroup = '${days[dt.weekday % 7]}, ${dt.day} ${months[dt.month - 1]}';
+        }
+      } catch (_) {}
+    } else if (json['tanggal_group'] != null) {
+      dateGroup = json['tanggal_group'].toString();
+    }
 
     return WorkoutItem(
       id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
       time: json['waktu']?.toString() ?? '07.00',
-      title: json['nama']?.toString() ?? json['title']?.toString() ?? 'Latihan',
-      subtitle: json['rincian']?.toString() ?? json['catatan']?.toString() ?? '$duration mnt sesi',
+      title: title,
+      subtitle: json['rincian']?.toString() ?? subtitle,
       value: json['nilai']?.toString() ?? '$duration mnt',
       category: category,
       categoryColor: catColor,
-      dateGroup: json['tanggal_group']?.toString() ?? 'HARI INI',
+      dateGroup: dateGroup,
     );
   }
 }

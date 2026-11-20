@@ -93,7 +93,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        user.name.isNotEmpty ? user.name[0].toUpperCase() : 'D',
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : 'P',
                         style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -117,7 +117,7 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user.email,
+                        user.email.isNotEmpty ? user.email : 'Belum terhubung',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,
@@ -265,8 +265,7 @@ class ProfileScreen extends StatelessWidget {
                           ),
                           Switch(
                             value: user.cloudBackupEnabled,
-                            activeColor: const Color(0xFF2E6B4A),
-                            activeTrackColor: const Color(0xFF2E6B4A).withOpacity(0.3),
+                            activeThumbColor: const Color(0xFF2E6B4A),
                             onChanged: (val) {
                               state.toggleCloudBackup(val);
                             },
@@ -279,11 +278,11 @@ class ProfileScreen extends StatelessWidget {
                     InkWell(
                       onTap: () => _triggerBackup(context, state),
                       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
+                          children: [
                             Text(
                               'Cadangkan sekarang',
                               style: TextStyle(
