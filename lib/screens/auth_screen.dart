@@ -10,8 +10,9 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final TextEditingController _emailController = TextEditingController(text: 'dimas@email.com');
-  final TextEditingController _passwordController = TextEditingController(text: '12345678');
+  final TextEditingController _nameController = TextEditingController(text: 'Budi');
+  final TextEditingController _emailController = TextEditingController(text: 'budi@example.com');
+  final TextEditingController _passwordController = TextEditingController(text: 'rahasia123');
   bool _obscurePassword = true;
   bool _isRegistering = false;
 
@@ -19,11 +20,12 @@ class _AuthScreenState extends State<AuthScreen> {
     final state = AppStateProvider.of(context);
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    final name = _nameController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty || (_isRegistering && name.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Email dan kata sandi tidak boleh kosong.'),
+          content: Text('Nama, email, dan kata sandi tidak boleh kosong.'),
           backgroundColor: AppColors.accentOrange,
         ),
       );
@@ -32,7 +34,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final String? error = _isRegistering
         ? await state.register(
-            email.split('@').first,
+            name,
             email,
             password,
           )
@@ -80,6 +82,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -127,6 +130,26 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 36),
+
+              if (_isRegistering) ...[
+                const Text(
+                  'Nama',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameController,
+                  style: const TextStyle(color: AppColors.darkCharcoal, fontSize: 15),
+                  decoration: const InputDecoration(
+                    hintText: 'Budi',
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               const Text(
                 'Email',

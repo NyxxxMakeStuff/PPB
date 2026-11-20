@@ -14,6 +14,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   late TextEditingController _heightController;
   late TextEditingController _targetKcalController;
   late TextEditingController _targetProteinController;
+  late TextEditingController _targetCarbsController;
+  late TextEditingController _targetFatController;
 
   @override
   void initState() {
@@ -22,6 +24,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     _heightController = TextEditingController();
     _targetKcalController = TextEditingController();
     _targetProteinController = TextEditingController();
+    _targetCarbsController = TextEditingController();
+    _targetFatController = TextEditingController();
   }
 
   @override
@@ -32,6 +36,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     _heightController.text = user.heightCm.toString();
     _targetKcalController.text = user.targetKcal.toString();
     _targetProteinController.text = user.targetProteinG.toString();
+    _targetCarbsController.text = user.targetCarbsG.toString();
+    _targetFatController.text = user.targetFatG.toString();
   }
 
   void _saveProfile() {
@@ -41,6 +47,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       heightCm: int.tryParse(_heightController.text) ?? state.userProfile.heightCm,
       targetKcal: int.tryParse(_targetKcalController.text) ?? state.userProfile.targetKcal,
       targetProteinG: int.tryParse(_targetProteinController.text) ?? state.userProfile.targetProteinG,
+      targetCarbsG: int.tryParse(_targetCarbsController.text) ?? state.userProfile.targetCarbsG,
+      targetFatG: int.tryParse(_targetFatController.text) ?? state.userProfile.targetFatG,
     );
 
     Navigator.pop(context);
@@ -59,6 +67,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     _heightController.dispose();
     _targetKcalController.dispose();
     _targetProteinController.dispose();
+    _targetCarbsController.dispose();
+    _targetFatController.dispose();
     super.dispose();
   }
 
@@ -161,6 +171,41 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                         controller: _targetProteinController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(hintText: '130'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Target Karbo (g)', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _targetCarbsController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: '250'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Target Lemak (g)', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _targetFatController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: '70'),
                       ),
                     ],
                   ),

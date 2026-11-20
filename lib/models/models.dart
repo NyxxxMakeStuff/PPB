@@ -8,6 +8,12 @@ class UserProfile {
   int heightCm;
   int targetKcal;
   int targetProteinG;
+  int targetCarbsG;
+  int targetFatG;
+  String jenisKelamin;
+  String tujuan;
+  String levelAktivitas;
+  String tanggalLahir;
   bool cloudBackupEnabled;
   String lastBackup;
   String unitSystem;
@@ -22,6 +28,12 @@ class UserProfile {
     required this.heightCm,
     required this.targetKcal,
     required this.targetProteinG,
+    this.targetCarbsG = 250,
+    this.targetFatG = 70,
+    this.jenisKelamin = 'L',
+    this.tujuan = 'maintain',
+    this.levelAktivitas = 'moderate',
+    this.tanggalLahir = '1995-05-12',
     this.cloudBackupEnabled = true,
     this.lastBackup = '21 Okt, 20.14',
     this.unitSystem = 'Metrik',
@@ -35,8 +47,10 @@ class UserProfile {
         : json;
 
     final heightVal = double.tryParse(userMap['tinggi_cm']?.toString() ?? '') ?? 172.0;
-    final kcalVal = double.tryParse(userMap['target_kalori']?.toString() ?? '') ?? 2600.0;
-    final protVal = double.tryParse(userMap['target_protein']?.toString() ?? '') ?? 130.0;
+    final kcalVal = double.tryParse(userMap['target_kalori']?.toString() ?? '') ?? 2200.0;
+    final protVal = double.tryParse(userMap['target_protein']?.toString() ?? '') ?? 120.0;
+    final carbsVal = double.tryParse(userMap['target_karbo']?.toString() ?? '') ?? 250.0;
+    final fatVal = double.tryParse(userMap['target_lemak']?.toString() ?? '') ?? 70.0;
     final idVal = userMap['id'] is int
         ? userMap['id'] as int
         : int.tryParse(userMap['id']?.toString() ?? '');
@@ -49,6 +63,12 @@ class UserProfile {
       heightCm: heightVal.round(),
       targetKcal: kcalVal.round(),
       targetProteinG: protVal.round(),
+      targetCarbsG: carbsVal.round(),
+      targetFatG: fatVal.round(),
+      jenisKelamin: userMap['jenis_kelamin']?.toString() ?? 'L',
+      tujuan: userMap['tujuan']?.toString() ?? 'maintain',
+      levelAktivitas: userMap['level_aktivitas']?.toString() ?? 'moderate',
+      tanggalLahir: userMap['tanggal_lahir']?.toString() ?? '1995-05-12',
       cloudBackupEnabled: true,
       lastBackup: 'Terhubung ke server',
     );
@@ -62,6 +82,12 @@ class UserProfile {
     int? heightCm,
     int? targetKcal,
     int? targetProteinG,
+    int? targetCarbsG,
+    int? targetFatG,
+    String? jenisKelamin,
+    String? tujuan,
+    String? levelAktivitas,
+    String? tanggalLahir,
     bool? cloudBackupEnabled,
     String? lastBackup,
     String? unitSystem,
@@ -76,6 +102,12 @@ class UserProfile {
       heightCm: heightCm ?? this.heightCm,
       targetKcal: targetKcal ?? this.targetKcal,
       targetProteinG: targetProteinG ?? this.targetProteinG,
+      targetCarbsG: targetCarbsG ?? this.targetCarbsG,
+      targetFatG: targetFatG ?? this.targetFatG,
+      jenisKelamin: jenisKelamin ?? this.jenisKelamin,
+      tujuan: tujuan ?? this.tujuan,
+      levelAktivitas: levelAktivitas ?? this.levelAktivitas,
+      tanggalLahir: tanggalLahir ?? this.tanggalLahir,
       cloudBackupEnabled: cloudBackupEnabled ?? this.cloudBackupEnabled,
       lastBackup: lastBackup ?? this.lastBackup,
       unitSystem: unitSystem ?? this.unitSystem,

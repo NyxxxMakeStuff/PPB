@@ -9,12 +9,12 @@ class NutritionScreen extends StatelessWidget {
   final VoidCallback? onBack;
   const NutritionScreen({super.key, this.onBack});
 
-  void _openEditMealSheet(BuildContext context, AppState state) {
+  void _openEditMealSheet(BuildContext context, AppState state, MealEntry meal) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => EditMealSheet(meal: state.currentMeal),
+      builder: (ctx) => EditMealSheet(meal: meal),
     );
   }
 
@@ -27,24 +27,52 @@ class NutritionScreen extends StatelessWidget {
     );
   }
 
-  void _logMealAgain(BuildContext context, AppState state) {
-    state.logMealAgain();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Catatan "${state.currentMeal.title}" (+${state.currentMeal.totalCalories} kkal) ditambahkan ke hari ini!',
+  void _logMealAgain(BuildContext context, AppState state, MealEntry meal) async {
+    await state.logMealAgain(meal);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Catatan "${meal.title}" (+${meal.totalCalories} kkal) ditambahkan ke hari ini!',
+          ),
+          backgroundColor: AppColors.darkCharcoal,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: AppColors.darkCharcoal,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    }
+  }
+
+  void _deleteMeal(BuildContext context, AppState state, MealEntry meal) async {
+    await state.deleteMeal(meal.id);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Catatan "${meal.title}" berhasil dihapus.'),
+          backgroundColor: AppColors.darkCharcoal,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateProvider.of(context);
-    final meal = state.currentMeal;
+    final meals = state.meals;
+
+    // Calculate total macros across all meals
+    int totalKcal = 0;
+    int totalProtein = 0;
+    int totalCarbs = 0;
+    int totalFat = 0;
+    for (var m in meals) {
+      totalKcal += m.totalCalories;
+      totalProtein += m.proteinG;
+      totalCarbs += m.carbsG;
+      totalFat += m.fatG;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -63,17 +91,6 @@ class NutritionScreen extends StatelessWidget {
             tooltip: 'Tambah Makanan',
             onPressed: () => _openAddFoodSheet(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Menu opsi jurnal nutrisi'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-          ),
         ],
       ),
       body: SafeArea(
@@ -82,118 +99,109 @@ class NutritionScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Subtitle category & time
-              Text(
-                meal.categoryTime,
-                style: AppTheme.uppercaseSubHeader(fontSize: 12),
-              ),
-              const SizedBox(height: 6),
-              // Meal Title
-              Text(
-                meal.title,
-                style: AppTheme.serifTitle(fontSize: 28),
-              ),
-              const SizedBox(height: 20),
+              // Summary Header Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.cardBorder, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOTAL ASUPAN HARI INI',
+                      style: AppTheme.uppercaseSubHeader(fontSize: 11),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '$totalKcal',
+                          style: const TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.darkCharcoal,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'kkal',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${meals.length} menu tercatat',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-              // Total Calories Row & info
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '${meal.totalCalories}',
-                    style: const TextStyle(
-                      fontSize: 52,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkCharcoal,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'kkal',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        meal.portionInfo,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
+                    // Segmented Macro Bar Chart
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        height: 12,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: totalProtein > 0 ? totalProtein : 1,
+                              child: Container(color: AppColors.greenIndicator),
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              flex: totalCarbs > 0 ? totalCarbs : 1,
+                              child: Container(color: AppColors.yellowIndicator),
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              flex: totalFat > 0 ? totalFat : 1,
+                              child: Container(color: AppColors.accentOrange),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        meal.estimateInfo,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                    ),
+                    const SizedBox(height: 14),
 
-              // Segmented Macro Bar Chart
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: SizedBox(
-                  height: 14,
-                  child: Row(
-                    children: [
-                      // Protein segment (Green)
-                      Expanded(
-                        flex: meal.proteinG > 0 ? meal.proteinG : 1,
-                        child: Container(color: AppColors.greenIndicator),
-                      ),
-                      const SizedBox(width: 3),
-                      // Carbs segment (Yellow)
-                      Expanded(
-                        flex: meal.carbsG > 0 ? meal.carbsG : 1,
-                        child: Container(color: AppColors.yellowIndicator),
-                      ),
-                      const SizedBox(width: 3),
-                      // Fat segment (Orange)
-                      Expanded(
-                        flex: meal.fatG > 0 ? meal.fatG : 1,
-                        child: Container(color: AppColors.accentOrange),
-                      ),
-                    ],
-                  ),
+                    // Macro Dot Legend
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildMacroLegend('Protein', '$totalProtein g', AppColors.greenIndicator),
+                        _buildMacroLegend('Karbohidrat', '$totalCarbs g', AppColors.yellowIndicator),
+                        _buildMacroLegend('Lemak', '$totalFat g', AppColors.accentOrange),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 28),
 
-              // Macro Dot Legend
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildMacroLegend('Protein', '${meal.proteinG} g', AppColors.greenIndicator),
-                  _buildMacroLegend('Karbohidrat', '${meal.carbsG} g', AppColors.yellowIndicator),
-                  _buildMacroLegend('Lemak', '${meal.fatG} g', AppColors.accentOrange),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // Section: Bahan & count
+              // Section Header: Daftar Makanan
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Bahan',
+                    'Daftar Makanan',
                     style: AppTheme.serifTitle(fontSize: 22),
                   ),
                   Text(
-                    '${meal.ingredients.length} item',
+                    '${meals.length} item',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -203,102 +211,22 @@ class NutritionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Ingredients List
-              if (meal.ingredients.isEmpty)
+              // Meals List (CRUD items)
+              if (meals.isEmpty)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+                  padding: EdgeInsets.symmetric(vertical: 30),
                   child: Center(
                     child: Text(
-                      'Belum ada bahan makanan tercatat.\nTekan tombol (+) di atas untuk menambah.',
+                      'Belum ada catatan makanan.\nTekan tombol (+) di atas untuk menambah.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
                     ),
                   ),
                 )
               else
-                ...meal.ingredients.map((ing) => _buildIngredientRow(ing)),
+                ...meals.map((meal) => _buildMealCard(context, state, meal)),
 
-              const SizedBox(height: 8),
-              // Divider & Total row
-              Container(height: 1.2, color: AppColors.darkCharcoal),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkCharcoal,
-                    ),
-                  ),
-                  Text(
-                    '${meal.totalCalories} kkal',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accentOrange,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 36),
-
-              // Bottom Action Buttons: Edit & Catat lagi hari ini
-              Row(
-                children: [
-                  // Edit Button
-                  SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _openEditMealSheet(context, state),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.darkCharcoal, width: 1.2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                      ),
-                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.darkCharcoal),
-                      label: const Text(
-                        'Edit',
-                        style: TextStyle(
-                          color: AppColors.darkCharcoal,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Catat lagi hari ini Button
-                  Expanded(
-                    child: SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () => _logMealAgain(context, state),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.darkCharcoal,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Catat lagi hari ini',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -319,13 +247,13 @@ class NutritionScreen extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          '$label\n',
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1),
+          '$label ',
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.bold,
             color: AppColors.darkCharcoal,
           ),
@@ -334,42 +262,122 @@ class NutritionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIngredientRow(Ingredient ing) {
+  Widget _buildMealCard(BuildContext context, AppState state, MealEntry meal) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider, width: 0.8)),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder, width: 1),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                ing.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkCharcoal,
-                ),
+                meal.categoryTime,
+                style: AppTheme.uppercaseSubHeader(fontSize: 11),
               ),
-              const SizedBox(height: 3),
-              Text(
-                ing.detail,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
+              Row(
+                children: [
+                  // Edit Button
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.darkCharcoal),
+                    tooltip: 'Edit Makanan',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => _openEditMealSheet(context, state, meal),
+                  ),
+                  const SizedBox(width: 12),
+                  // Delete Button
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                    tooltip: 'Hapus Makanan',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () => _deleteMeal(context, state, meal),
+                  ),
+                ],
               ),
             ],
           ),
+          const SizedBox(height: 6),
           Text(
-            '${ing.calories}',
+            meal.title,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.darkCharcoal,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${meal.totalCalories} kkal · P: ${meal.proteinG}g · K: ${meal.carbsG}g · L: ${meal.fatG}g',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accentOrange,
+                ),
+              ),
+              Text(
+                meal.portionInfo,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 10),
+          // Ingredients summary
+          if (meal.ingredients.isNotEmpty)
+            ...meal.ingredients.map((ing) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '• ${ing.name} (${ing.detail})',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        '${ing.calories} kkal',
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                )),
+          const SizedBox(height: 12),
+          // Quick action: Catat lagi
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton(
+              onPressed: () => _logMealAgain(context, state, meal),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.darkCharcoal, width: 1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.add, size: 16, color: AppColors.darkCharcoal),
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Catat lagi hari ini',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.darkCharcoal),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

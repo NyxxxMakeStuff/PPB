@@ -14,6 +14,8 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _caloriesController = TextEditingController();
   final TextEditingController _proteinController = TextEditingController();
+  final TextEditingController _carbsController = TextEditingController();
+  final TextEditingController _fatController = TextEditingController();
   final TextEditingController _portionController = TextEditingController(text: '1 porsi');
   String _waktuMakan = 'sarapan';
 
@@ -21,6 +23,8 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
     final title = _titleController.text.trim();
     final kcal = int.tryParse(_caloriesController.text.trim()) ?? 0;
     final protein = int.tryParse(_proteinController.text.trim()) ?? 0;
+    final carbs = int.tryParse(_carbsController.text.trim()) ?? (kcal * 0.4 / 4).round();
+    final fat = int.tryParse(_fatController.text.trim()) ?? (kcal * 0.3 / 9).round();
 
     if (title.isEmpty || kcal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,15 +46,14 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
       portionInfo: _portionController.text.trim(),
       estimateInfo: 'Pencatatan mandiri',
       proteinG: protein,
-      carbsG: (kcal * 0.4 / 4).round(),
-      fatG: (kcal * 0.3 / 9).round(),
+      carbsG: carbs,
+      fatG: fat,
       ingredients: [
         Ingredient(name: title, detail: _portionController.text.trim(), calories: kcal),
       ],
     );
 
-    state.updateMeal(newMeal);
-    await state.logMealAgain();
+    state.addMeal(newMeal);
 
     if (mounted) {
       Navigator.pop(context);
@@ -69,6 +72,8 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
     _titleController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
     _portionController.dispose();
     super.dispose();
   }
@@ -141,6 +146,7 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
             ),
             const SizedBox(height: 16),
 
+            // Row 1: Kalori & Protein
             Row(
               children: [
                 Expanded(
@@ -168,6 +174,42 @@ class _AddFoodSheetState extends State<AddFoodSheet> {
                         controller: _proteinController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(hintText: '30'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Row 2: Karbohidrat & Lemak
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Karbohidrat (g)', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _carbsController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: '60 (Opsional)'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Lemak (g)', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _fatController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(hintText: '18 (Opsional)'),
                       ),
                     ],
                   ),

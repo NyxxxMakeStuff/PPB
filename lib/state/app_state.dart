@@ -49,6 +49,42 @@ class AppState extends ChangeNotifier {
 
   final List<WorkoutItem> _workouts = [];
 
+  final List<MealEntry> _meals = [
+    MealEntry(
+      id: 'm1',
+      categoryTime: 'SARAPAN · 07.15',
+      title: 'Oatmeal & Telur Rebus',
+      totalCalories: 450,
+      portionInfo: '1 porsi · 250g',
+      estimateInfo: 'Pencatatan mandiri',
+      proteinG: 25,
+      carbsG: 50,
+      fatG: 12,
+      ingredients: [
+        Ingredient(name: 'Oatmeal', detail: '50g', calories: 150),
+        Ingredient(name: 'Telur Rebus', detail: '2 butir', calories: 140),
+        Ingredient(name: 'Susu Low Fat', detail: '200ml', calories: 160),
+      ],
+    ),
+    MealEntry(
+      id: 'm2',
+      categoryTime: 'SIANG · 12.30',
+      title: 'Nasi Merah & Dada Ayam Grill',
+      totalCalories: 600,
+      portionInfo: '1 porsi · 350g',
+      estimateInfo: 'Pencatatan mandiri',
+      proteinG: 45,
+      carbsG: 65,
+      fatG: 10,
+      ingredients: [
+        Ingredient(name: 'Nasi Merah', detail: '150g', calories: 170),
+        Ingredient(name: 'Dada Ayam Grill', detail: '150g', calories: 250),
+        Ingredient(name: 'Sayur Bayam & Brokoli', detail: '100g', calories: 80),
+        Ingredient(name: 'Minyak Zaitun', detail: '1 sdt', calories: 100),
+      ],
+    ),
+  ];
+
   MealEntry _currentMeal = MealEntry(
     id: 'm1',
     categoryTime: 'SARAPAN · 07.15',
@@ -75,7 +111,8 @@ class AppState extends ChangeNotifier {
   int get remainingCalories => (_userProfile.targetKcal - _caloriesConsumed).clamp(0, 99999);
   WorkoutCategory get selectedWorkoutFilter => _selectedWorkoutFilter;
   Map<String, int> get weeklyCalories => _weeklyCalories;
-  MealEntry get currentMeal => _currentMeal;
+  List<MealEntry> get meals => _meals;
+  MealEntry get currentMeal => _meals.isNotEmpty ? _meals.first : _currentMeal;
 
   List<WorkoutItem> get filteredWorkouts {
     if (_selectedWorkoutFilter == WorkoutCategory.semua) {
@@ -85,6 +122,7 @@ class AppState extends ChangeNotifier {
   }
 
   AppState() {
+    _recalculateTotals();
     _restoreSession();
   }
 
@@ -129,7 +167,17 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<String?> register(String nama, String email, String password) async {
+  Future<String?> register(
+    String nama,
+    String email,
+    String password, {
+    String jenisKelamin = 'L',
+    String tujuan = 'maintain',
+    int targetKalori = 2200,
+    double targetProtein = 120.0,
+    double targetKarbo = 250.0,
+    double targetLemak = 70.0,
+  }) async {
     _isLoading = true;
     _authError = null;
     notifyListeners();
@@ -140,6 +188,12 @@ class AppState extends ChangeNotifier {
         nama: displayName,
         email: email,
         password: password,
+        jenisKelamin: jenisKelamin,
+        tujuan: tujuan,
+        targetKalori: targetKalori,
+        targetProtein: targetProtein,
+        targetKarbo: targetKarbo,
+        targetLemak: targetLemak,
       );
       final userJson = await ApiService.getMe();
       _userProfile = UserProfile.fromJson(userJson, defaultWeight: _userProfile.weightKg);
@@ -268,12 +322,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateUserTargets({int? targetKcal, int? targetProteinG, int? weightKg, int? heightCm}) async {
+  Future<void> updateUserTargets({
+    int? targetKcal,
+    int? targetProteinG,
+    int? targetCarbsG,
+    int? targetFatG,
+    int? weightKg,
+    int? heightCm,
+    String? jenisKelamin,
+    String? tujuan,
+  }) async {
     _userProfile = _userProfile.copyWith(
       targetKcal: targetKcal ?? _userProfile.targetKcal,
       targetProteinG: targetProteinG ?? _userProfile.targetProteinG,
+      targetCarbsG: targetCarbsG ?? _userProfile.targetCarbsG,
+      targetFatG: targetFatG ?? _userProfile.targetFatG,
       weightKg: weightKg ?? _userProfile.weightKg,
       heightCm: heightCm ?? _userProfile.heightCm,
+      jenisKelamin: jenisKelamin ?? _userProfile.jenisKelamin,
+      tujuan: tujuan ?? _userProfile.tujuan,
     );
     notifyListeners();
 
@@ -283,6 +350,10 @@ class AppState extends ChangeNotifier {
         if (heightCm != null) updateData['tinggi_cm'] = heightCm;
         if (targetKcal != null) updateData['target_kalori'] = targetKcal;
         if (targetProteinG != null) updateData['target_protein'] = targetProteinG;
+        if (targetCarbsG != null) updateData['target_karbo'] = targetCarbsG;
+        if (targetFatG != null) updateData['target_lemak'] = targetFatG;
+        if (jenisKelamin != null) updateData['jenis_kelamin'] = jenisKelamin;
+        if (tujuan != null) updateData['tujuan'] = tujuan;
         
         if (updateData.isNotEmpty) {
           await ApiService.updateUserProfile(_userProfile.id!, updateData);
@@ -352,17 +423,28 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> logMealAgain() async {
-    _caloriesConsumed += _currentMeal.totalCalories;
-    _proteinConsumed += _currentMeal.proteinG;
+  void _recalculateTotals() {
+    int kcal = 0;
+    int prot = 0;
+    for (var m in _meals) {
+      kcal += m.totalCalories;
+      prot += m.proteinG;
+    }
+    _caloriesConsumed = kcal;
+    _proteinConsumed = prot;
     _weeklyCalories['Kam'] = _caloriesConsumed;
+  }
+
+  Future<void> addMeal(MealEntry meal) async {
+    _meals.insert(0, meal);
+    _currentMeal = meal;
+    _recalculateTotals();
     notifyListeners();
 
     if (!_isGuestMode && _userProfile.id != null) {
       try {
-        final todayStr = DateTime.now().toIso8601String().split('T').first;
         String waktuMakan = 'sarapan';
-        final lowerCat = _currentMeal.categoryTime.toLowerCase();
+        final lowerCat = meal.categoryTime.toLowerCase();
         if (lowerCat.contains('siang')) {
           waktuMakan = 'siang';
         } else if (lowerCat.contains('malam')) {
@@ -371,6 +453,7 @@ class AppState extends ChangeNotifier {
           waktuMakan = 'snack';
         }
 
+        final todayStr = DateTime.now().toIso8601String().split('T').first;
         final res = await ApiService.createNutritionLog(
           _userProfile.id!,
           todayStr,
@@ -382,24 +465,34 @@ class AppState extends ChangeNotifier {
             : res;
         final logId = logData['id'] is int ? logData['id'] as int : int.tryParse(logData['id']?.toString() ?? '');
 
-        if (logId != null) {
+        if (logId != null && meal.ingredients.isNotEmpty) {
           try {
             final foods = await ApiService.getFoods();
             int foodId = 1;
             if (foods.isNotEmpty && foods[0] is Map && foods[0]['id'] != null) {
               foodId = int.tryParse(foods[0]['id'].toString()) ?? 1;
+            } else {
+              try {
+                final newFoodRes = await ApiService.createFood(nama: meal.title);
+                final foodData = (newFoodRes['data'] is Map<String, dynamic>)
+                    ? newFoodRes['data'] as Map<String, dynamic>
+                    : newFoodRes;
+                foodId = int.tryParse(foodData['id']?.toString() ?? '') ?? 1;
+              } catch (_) {}
             }
 
             await ApiService.createNutritionLogItem(
               logId,
               foodId,
               100.0,
-              _currentMeal.totalCalories.toDouble(),
-              _currentMeal.proteinG.toDouble(),
-              carbsG: _currentMeal.carbsG.toDouble(),
-              fatG: _currentMeal.fatG.toDouble(),
+              meal.totalCalories.toDouble(),
+              meal.proteinG.toDouble(),
+              carbsG: meal.carbsG.toDouble(),
+              fatG: meal.fatG.toDouble(),
             );
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Failed to create nutrition log item on server: $e');
+          }
         }
       } catch (e) {
         debugPrint('Failed to create nutrition log on server: $e');
@@ -407,8 +500,49 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void updateMeal(MealEntry meal) {
+  Future<void> updateMeal(MealEntry meal) async {
+    final index = _meals.indexWhere((m) => m.id == meal.id);
+    if (index != -1) {
+      _meals[index] = meal;
+    } else {
+      _meals.insert(0, meal);
+    }
     _currentMeal = meal;
+    _recalculateTotals();
     notifyListeners();
+  }
+
+  Future<void> deleteMeal(String id) async {
+    _meals.removeWhere((m) => m.id == id);
+    _recalculateTotals();
+    notifyListeners();
+
+    if (!_isGuestMode) {
+      try {
+        final numericId = int.tryParse(id);
+        if (numericId != null) {
+          await ApiService.deleteNutritionLog(numericId);
+        }
+      } catch (e) {
+        debugPrint('Failed to delete nutrition log on server: $e');
+      }
+    }
+  }
+
+  Future<void> logMealAgain([MealEntry? meal]) async {
+    final targetMeal = meal ?? currentMeal;
+    final duplicated = MealEntry(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      categoryTime: targetMeal.categoryTime,
+      title: '${targetMeal.title} (Lagi)',
+      totalCalories: targetMeal.totalCalories,
+      portionInfo: targetMeal.portionInfo,
+      estimateInfo: targetMeal.estimateInfo,
+      proteinG: targetMeal.proteinG,
+      carbsG: targetMeal.carbsG,
+      fatG: targetMeal.fatG,
+      ingredients: targetMeal.ingredients.map((i) => Ingredient(name: i.name, detail: i.detail, calories: i.calories)).toList(),
+    );
+    await addMeal(duplicated);
   }
 }

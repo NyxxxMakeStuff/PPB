@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -8,9 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static String get baseUrl {
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://192.168.1.5:3000/api';
+      return 'http://192.168.43.95:3000/api';
     }
-    return 'http://192.168.1.5:3000/api';
+    return 'http://192.168.43.95:3000/api';
   }
 
   static const String _accessTokenKey = 'access_token';
@@ -98,17 +99,26 @@ class ApiService {
   static Future<http.Response> _authedRequest(
     Future<http.Response> Function(Map<String, String> headers) requestFn,
   ) async {
-    var headers = await _headers(withAuth: true);
-    var response = await requestFn(headers);
+    try {
+      var headers = await _headers(withAuth: true);
+      var response = await requestFn(headers).timeout(const Duration(seconds: 5));
 
-    if (response.statusCode == 401) {
-      final newAccess = await refreshTokens();
-      if (newAccess != null && newAccess.isNotEmpty) {
-        headers = await _headers(withAuth: true);
-        response = await requestFn(headers);
+      if (response.statusCode == 401) {
+        final newAccess = await refreshTokens();
+        if (newAccess != null && newAccess.isNotEmpty) {
+          headers = await _headers(withAuth: true);
+          response = await requestFn(headers).timeout(const Duration(seconds: 5));
+        }
       }
+      return response;
+    } on TimeoutException {
+      throw ApiException('Koneksi timeout ke server backend. Pastikan server aktif.', 408);
+    } on SocketException {
+      throw ApiException('Tidak dapat terhubung ke server backend. Periksa apakah server sedang berjalan.', 503);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Gagal terhubung ke server backend: $e', 500);
     }
-    return response;
   }
 
   static Future<String?> refreshTokens() async {
@@ -122,7 +132,8 @@ class ApiService {
         url,
         headers: await _headers(withAuth: false),
         body: jsonEncode({'refresh_token': refreshToken}),
-      );
+      ).timeout(const Duration(seconds: 5));
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = _parseResponse(response);
         final session = (data is Map && data['data'] is Map) ? data['data'] as Map<String, dynamic> : (data is Map ? data : {});
@@ -141,24 +152,33 @@ class ApiService {
   static Future<Map<String, dynamic>> login(String email, String password) async {
     final url = Uri.parse('$baseUrl/auth/login');
     debugPrint('API POST login: $url');
-    final response = await http.post(
-      url,
-      headers: await _headers(withAuth: false),
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-      }),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: await _headers(withAuth: false),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 5));
 
-    final data = _parseResponse(response);
-    final session = (data is Map && data['data'] is Map) ? data['data'] as Map<String, dynamic> : (data is Map ? data : {});
-    final accessToken = session['access_token'] ?? session['accessToken'];
-    final refreshToken = session['refresh_token'] ?? session['refreshToken'];
+      final data = _parseResponse(response);
+      final session = (data is Map && data['data'] is Map) ? data['data'] as Map<String, dynamic> : (data is Map ? data : {});
+      final accessToken = session['access_token'] ?? session['accessToken'];
+      final refreshToken = session['refresh_token'] ?? session['refreshToken'];
 
-    if (accessToken != null) {
-      await saveTokens(accessToken.toString(), refreshToken?.toString() ?? '');
+      if (accessToken != null) {
+        await saveTokens(accessToken.toString(), refreshToken?.toString() ?? '');
+      }
+      return data is Map<String, dynamic> ? data : {};
+    } on TimeoutException {
+      throw ApiException('Koneksi timeout ke server backend. Pastikan server aktif.', 408);
+    } on SocketException {
+      throw ApiException('Tidak dapat terhubung ke server backend. Periksa apakah server sedang berjalan.', 503);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Gagal terhubung ke server backend: $e', 500);
     }
-    return data is Map<String, dynamic> ? data : {};
   }
 
   static Future<Map<String, dynamic>> register({
@@ -170,8 +190,10 @@ class ApiService {
     double? tinggiCm = 172.0,
     String? levelAktivitas = 'moderate',
     String? tujuan = 'maintain',
-    int? targetKalori = 2600,
-    double? targetProtein = 130.0,
+    int? targetKalori = 2200,
+    double? targetProtein = 120.0,
+    double? targetKarbo = 250.0,
+    double? targetLemak = 70.0,
   }) async {
     final url = Uri.parse('$baseUrl/auth/register');
     debugPrint('API POST register: $url');
@@ -186,23 +208,34 @@ class ApiService {
       'tujuan': tujuan,
       'target_kalori': targetKalori,
       'target_protein': targetProtein,
+      'target_karbo': targetKarbo,
+      'target_lemak': targetLemak,
     };
 
-    final response = await http.post(
-      url,
-      headers: await _headers(withAuth: false),
-      body: jsonEncode(body),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: await _headers(withAuth: false),
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 5));
 
-    final data = _parseResponse(response);
-    final session = (data is Map && data['data'] is Map) ? data['data'] as Map<String, dynamic> : (data is Map ? data : {});
-    final accessToken = session['access_token'] ?? session['accessToken'];
-    final refreshToken = session['refresh_token'] ?? session['refreshToken'];
+      final data = _parseResponse(response);
+      final session = (data is Map && data['data'] is Map) ? data['data'] as Map<String, dynamic> : (data is Map ? data : {});
+      final accessToken = session['access_token'] ?? session['accessToken'];
+      final refreshToken = session['refresh_token'] ?? session['refreshToken'];
 
-    if (accessToken != null) {
-      await saveTokens(accessToken.toString(), refreshToken?.toString() ?? '');
+      if (accessToken != null) {
+        await saveTokens(accessToken.toString(), refreshToken?.toString() ?? '');
+      }
+      return data is Map<String, dynamic> ? data : {};
+    } on TimeoutException {
+      throw ApiException('Koneksi timeout ke server backend. Pastikan server aktif.', 408);
+    } on SocketException {
+      throw ApiException('Tidak dapat terhubung ke server backend. Periksa apakah server sedang berjalan.', 503);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Gagal terhubung ke server backend: $e', 500);
     }
-    return data is Map<String, dynamic> ? data : {};
   }
 
   static Future<Map<String, dynamic>> getMe() async {
@@ -222,7 +255,7 @@ class ApiService {
           url,
           headers: await _headers(withAuth: true),
           body: jsonEncode({'refresh_token': refreshToken}),
-        );
+        ).timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
     await clearTokens();
@@ -336,6 +369,13 @@ class ApiService {
     return _parseResponse(response);
   }
 
+  static Future<Map<String, dynamic>> deleteNutritionLog(int id) async {
+    final url = Uri.parse('$baseUrl/nutrition_logs/$id');
+    debugPrint('API DELETE nutrition_logs/$id: $url');
+    final response = await _authedRequest((headers) => http.delete(url, headers: headers));
+    return _parseResponse(response);
+  }
+
   static Future<List<dynamic>> getNutritionLogItems() async {
     final url = Uri.parse('$baseUrl/nutrition_log_items');
     debugPrint('API GET nutrition_log_items: $url');
@@ -369,6 +409,31 @@ class ApiService {
           'protein_g': proteinG,
           'karbo_g': carbsG,
           'lemak_g': fatG,
+        }),
+      ),
+    );
+    return _parseResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> createFood({
+    required String nama,
+    double kaloriPer100g = 100.0,
+    double proteinPer100g = 10.0,
+    double karboPer100g = 15.0,
+    double lemakPer100g = 5.0,
+  }) async {
+    final url = Uri.parse('$baseUrl/foods');
+    debugPrint('API POST foods: $url');
+    final response = await _authedRequest(
+      (headers) => http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({
+          'nama': nama,
+          'kalori_per_100g': kaloriPer100g,
+          'protein_per_100g': proteinPer100g,
+          'karbo_per_100g': karboPer100g,
+          'lemak_per_100g': lemakPer100g,
         }),
       ),
     );
@@ -426,7 +491,7 @@ class ApiService {
           }
         }
       } else if (jsonBody['message'] != null) {
-        message = jsonBody['message'].toString();
+        message = jsonBody['message'].toString() ;
       }
     }
     throw ApiException(message, response.statusCode);
